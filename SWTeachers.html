@@ -123,7 +123,7 @@
                 <!-- QR読み取りボタン -->
                 <div class="pt-2">
                     <button id="startScanBtn" onclick="toggleCamera()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
-                        <span>先生のQRコードを読み取って確認送信</span>
+                        <span>📷 先生のQRコードを読み取って確認送信</span>
                     </button>
                 </div>
 
@@ -173,7 +173,7 @@
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
         
-        // 新しい先生用QRコードの完全一致判定用文字列
+        // 先生用QRコードの目標ターゲットURL
         const TEACHER_QR_TARGET = "https://2024i001.github.io/Application2026/supersecrethypertextmarkuplanguage.html";
 
         let masterStudentList = []; // 生徒マスター（氏名+ID）配列
@@ -415,15 +415,18 @@
 
                         const scannedVal = code.data.trim();
 
-                        // 先生用QRコードの完全一致判定
-                        if (scannedVal !== TEACHER_QR_TARGET) {
+                        // 末尾のスラッシュ(/)や大文字小文字の差異を吸収して正規化比較
+                        const cleanScanned = scannedVal.replace(/\/$/, "").toLowerCase();
+                        const cleanTarget  = TEACHER_QR_TARGET.replace(/\/$/, "").toLowerCase();
+
+                        if (cleanScanned !== cleanTarget) {
                             resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
-                            resultDiv.innerText = "❌ 認証エラー: 正しい先生用QRコードではありません。";
+                            resultDiv.innerHTML = `❌ 認証エラー: 正しい先生用QRコードではありません。<br><span class="text-xs font-normal text-slate-600 block mt-1">読み取った値: ${scannedVal}</span>`;
                             resultDiv.classList.remove("hidden");
 
                             setTimeout(() => {
                                 isProcessing = false;
-                            }, 2000);
+                            }, 2500);
                             return;
                         }
 
@@ -448,7 +451,7 @@
             }
             document.getElementById("cameraContainer").classList.add("hidden");
             const startBtn = document.getElementById("startScanBtn");
-            startBtn.innerHTML = "<span>先生のQRコードを読み取って確認送信</span>";
+            startBtn.innerHTML = "<span>📷 先生のQRコードを読み取って確認送信</span>";
             startBtn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2";
         }
 
