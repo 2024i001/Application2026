@@ -11,6 +11,9 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10">
 
+    <!-- 生徒ID予測変換用の共通データリスト -->
+    <datalist id="studentListOptions"></datalist>
+
     <header class="bg-indigo-900 text-white py-3 px-4 shadow-md text-center">
         <h1 class="text-lg font-bold tracking-wide">生徒面接サポートポータル</h1>
     </header>
@@ -58,10 +61,11 @@
                     </select>
                 </div>
 
-                <!-- 生徒ID入力 -->
+                <!-- 生徒ID入力（予測変換機能付き） -->
                 <div>
-                    <label for="studentIdRecord" class="block text-sm font-semibold text-slate-700 mb-1">③ あなたの生徒IDを入力（例: 24i01）</label>
-                    <input type="text" id="studentIdRecord" placeholder="生徒IDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <label for="studentIdRecord" class="block text-sm font-semibold text-slate-700 mb-1">③ あなたの氏名・生徒ID（予測変換対応）</label>
+                    <input type="text" id="studentIdRecord" list="studentListOptions" placeholder="名前または生徒IDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <p class="text-xs text-slate-500 mt-1">※名前やIDを入力すると予測候補が表示されます。</p>
                 </div>
 
                 <!-- QR読み取りボタン -->
@@ -73,7 +77,7 @@
 
                 <!-- カメラ表示エリア -->
                 <div id="cameraContainer" class="hidden text-center space-y-2 mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p class="text-sm font-bold text-indigo-700">先生が持っているQRコードをカメラにかざしてください</p>
+                    <p class="text-sm font-bold text-indigo-700">先生が持っている承認用QRコードをカメラにかざしてください</p>
                     <canvas id="canvas" class="w-full max-w-sm mx-auto border-2 border-indigo-500 rounded-lg bg-black"></canvas>
                 </div>
 
@@ -94,9 +98,8 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">氏名・生徒ID</label>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">氏名・生徒ID（予測変換対応）</label>
                     <input type="text" id="candidateName" list="studentListOptions" placeholder="名前またはIDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                    <datalist id="studentListOptions"></datalist>
                 </div>
 
                 <div>
@@ -119,6 +122,9 @@
 
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
+        
+        // 許可する先生用QRコードの文字列（完全一致専用）
+        const TEACHER_QR_TARGET = "https://qr.generatorqr.com/Aj2wN9B4S";
 
         let teacherDataMap = {};
         let isCameraRunning = false;
@@ -129,6 +135,7 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             loadTeachers();
+            loadStudentMaster();
             initCalendar();
 
             // 学科選択連動
@@ -156,6 +163,26 @@
         });
 
         // ----------------------------------------------------
+        // 生徒マスターの動的取得（予測変換リスト生成）
+        // ----------------------------------------------------
+        function loadStudentMaster() {
+            const datalist = document.getElementById('studentListOptions');
+            fetch(GAS_WEB_APP_URL + "?mode=summary")
+                .then(res => res.json())
+                .then(data => {
+                    if (data && typeof data === 'object') {
+                        datalist.innerHTML = '';
+                        Object.keys(data).forEach(studentKey => {
+                            const option = document.createElement('option');
+                            option.value = studentKey; // 例: "五十嵐 伶24i01"
+                            datalist.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => console.error("生徒マスター取得失敗:", err));
+        }
+
+        // ----------------------------------------------------
         // タブ切り替え機能
         // ----------------------------------------------------
         function switchTab(target) {
@@ -173,7 +200,6 @@
                 btnRecord.className = activeClass;
                 btnSchedule.className = inactiveClass;
             } else {
-                // カメラが動いていたら停止
                 if (isCameraRunning) stopCamera();
 
                 panelSchedule.classList.remove('hidden');
@@ -181,7 +207,6 @@
                 btnSchedule.className = activeClass;
                 btnRecord.className = inactiveClass;
 
-                // カレンダーの表示サイズ崩れ防止
                 if (calendar) {
                     setTimeout(() => calendar.updateSize(), 50);
                 }
@@ -223,7 +248,7 @@
                     return;
                 }
                 if (!studentId) {
-                    alert("生徒IDを入力してください。");
+                    alert("生徒ID（または名前）を入力してください。");
                     return;
                 }
                 startCamera();
@@ -273,13 +298,20 @@
                         const studentId = document.getElementById("studentIdRecord").value.trim();
 
                         const scannedVal = code.data.trim();
-                        if (!scannedVal.includes(teacherName) && scannedVal !== teacherName) {
-                            if (!confirm(`読み取ったQR（${scannedVal}）が選択した先生名（${teacherName}）と一致しませんが、送信しますか？`)) {
-                                setTimeout(() => { isProcessing = false; }, 1500);
-                                return;
-                            }
+
+                        // 先生用QRコードの完全一致判定
+                        if (scannedVal !== TEACHER_QR_TARGET) {
+                            resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
+                            resultDiv.innerText = "❌ 認証エラー: 正しい先生用QRコードではありません。";
+                            resultDiv.classList.remove("hidden");
+
+                            setTimeout(() => {
+                                isProcessing = false;
+                            }, 2000);
+                            return;
                         }
 
+                        // 完全一致した場合のみ送信処理へ移行
                         sendInterviewRecord(teacherName, studentId);
                         return;
                     }
@@ -306,7 +338,7 @@
         function sendInterviewRecord(teacherName, studentId) {
             stopCamera();
             const resultDiv = document.getElementById("recordResult");
-            resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-blue-50 text-blue-700 border border-blue-200";
+            resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-blue-50 text-blue-700 border border-blue-200 mt-3";
             resultDiv.innerText = "送信中...";
             resultDiv.classList.remove("hidden");
 
@@ -318,16 +350,16 @@
             .then(res => res.json())
             .then(res => {
                 if (res.status === "Success") {
-                    resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-green-50 text-green-800 border border-green-300";
+                    resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-green-50 text-green-800 border border-green-300 mt-3";
                     resultDiv.innerHTML = `✅ 記録完了！<br>生徒名: ${res.name} / 担当: ${teacherName}先生`;
                     document.getElementById("studentIdRecord").value = "";
                 } else {
-                    resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300";
+                    resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
                     resultDiv.innerText = "エラー: " + res.message;
                 }
             })
             .catch(err => {
-                resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300";
+                resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
                 resultDiv.innerText = "通信エラー: " + err.message;
             });
         }
