@@ -20,9 +20,7 @@
 
     <main class="max-w-3xl mx-auto p-4 sm:p-6">
 
-        <!-- ====================================================
-             セグメントタブコントロール（画面切り替え）
-        ==================================================== -->
+        <!-- セグメントタブコントロール -->
         <div class="flex p-1.5 bg-slate-200/80 rounded-xl mb-6 shadow-inner">
             <button id="tab-btn-record" onclick="switchTab('record')" 
                     class="flex-1 py-2.5 px-3 rounded-lg font-bold text-sm text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-2">
@@ -35,9 +33,7 @@
         </div>
 
 
-        <!-- ====================================================
-             TAB 1: 面接練習記録（先生のQR承認機能）
-        ==================================================== -->
+        <!-- TAB 1: 面接練習記録（先生のQR承認機能） -->
         <div id="panel-record" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-5">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 mb-1">面接練習の完了記録</h2>
@@ -61,11 +57,11 @@
                     </select>
                 </div>
 
-                <!-- 生徒ID入力（予測変換機能付き） -->
+                <!-- 生徒ID入力（予測変換・補正対応） -->
                 <div>
-                    <label for="studentIdRecord" class="block text-sm font-semibold text-slate-700 mb-1">③ あなたの氏名・生徒ID（予測変換対応）</label>
-                    <input type="text" id="studentIdRecord" list="studentListOptions" placeholder="名前または生徒IDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                    <p class="text-xs text-slate-500 mt-1">※名前やIDを入力すると予測候補が表示されます。</p>
+                    <label for="studentIdRecord" class="block text-sm font-semibold text-slate-700 mb-1">③ あなたの氏名・生徒ID</label>
+                    <input type="text" id="studentIdRecord" list="studentListOptions" onblur="autoResolveInput('studentIdRecord')" placeholder="名前またはIDを入力（出席番号2桁でも検索可）" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <p class="text-xs text-slate-500 mt-1">※名前を入力すると予測変換が出ます。</p>
                 </div>
 
                 <!-- QR読み取りボタン -->
@@ -87,9 +83,7 @@
         </div>
 
 
-        <!-- ====================================================
-             TAB 2: 面接本番スケジュール登録＆カレンダー
-        ==================================================== -->
+        <!-- TAB 2: 面接本番スケジュール登録＆カレンダー -->
         <div id="panel-schedule" class="hidden bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 mb-1">面接本番スケジュールの登録</h2>
@@ -98,8 +92,8 @@
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1">氏名・生徒ID（予測変換対応）</label>
-                    <input type="text" id="candidateName" list="studentListOptions" placeholder="名前またはIDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">氏名・生徒ID</label>
+                    <input type="text" id="candidateName" list="studentListOptions" onblur="autoResolveInput('candidateName')" placeholder="名前またはIDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                 </div>
 
                 <div>
@@ -123,9 +117,10 @@
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
         
-        // 許可する先生用QRコードの文字列（完全一致専用）
+        // 許可する先生用QRコードの文字列（完全一致）
         const TEACHER_QR_TARGET = "https://qr.generatorqr.com/Aj2wN9B4S";
 
+        let masterStudentList = []; // 生徒マスター（氏名+ID）配列
         let teacherDataMap = {};
         let isCameraRunning = false;
         let localStream = null;
@@ -135,7 +130,7 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             loadTeachers();
-            loadStudentMaster();
+            fetchStudentMaster();
             initCalendar();
 
             // 学科選択連動
@@ -163,23 +158,62 @@
         });
 
         // ----------------------------------------------------
-        // 生徒マスターの動的取得（予測変換リスト生成）
+        // 生徒マスター取得＆予測変換datalist構築
         // ----------------------------------------------------
-        function loadStudentMaster() {
-            const datalist = document.getElementById('studentListOptions');
-            fetch(GAS_WEB_APP_URL + "?mode=summary")
-                .then(res => res.json())
-                .then(data => {
-                    if (data && typeof data === 'object') {
+        async function fetchStudentMaster() {
+            try {
+                const res = await fetch(GAS_WEB_APP_URL + "?mode=students");
+                if (res.ok) {
+                    const list = await res.json();
+                    if (Array.isArray(list)) {
+                        masterStudentList = list;
+                        const datalist = document.getElementById('studentListOptions');
                         datalist.innerHTML = '';
-                        Object.keys(data).forEach(studentKey => {
+                        list.forEach(item => {
                             const option = document.createElement('option');
-                            option.value = studentKey; // 例: "五十嵐 伶24i01"
+                            option.value = item;
                             datalist.appendChild(option);
                         });
                     }
-                })
-                .catch(err => console.error("生徒マスター取得失敗:", err));
+                }
+            } catch (err) {
+                console.warn("マスターデータ取得エラー:", err);
+            }
+        }
+
+        // 名前入力をマスターの「名前+ID」の形に判定・変換する補正ロジック
+        function resolveStudentId(inputText) {
+            const query = inputText.trim();
+            if (!query) return '';
+
+            // 1. 完全一致
+            const exactMatch = masterStudentList.find(item => item === query);
+            if (exactMatch) return exactMatch;
+
+            const clean = (str) => str.replace(/\s+/g, '').toLowerCase();
+            const cleanedQuery = clean(query);
+
+            // 2. 空白無関係で一致
+            const spaceIgnoreMatch = masterStudentList.find(item => clean(item) === cleanedQuery);
+            if (spaceIgnoreMatch) return spaceIgnoreMatch;
+
+            // 3. 名前から始まる場合
+            const startsWithMatch = masterStudentList.find(item => clean(item).startsWith(cleanedQuery));
+            if (startsWithMatch) return startsWithMatch;
+
+            // 4. 名前の一部が含まれる場合
+            const includesMatch = masterStudentList.find(item => clean(item).includes(cleanedQuery));
+            if (includesMatch) return includesMatch;
+
+            return query;
+        }
+
+        // 入力欄を離れた時に自動補正する処理
+        function autoResolveInput(elementId) {
+            const inputEl = document.getElementById(elementId);
+            if (inputEl && inputEl.value.trim()) {
+                inputEl.value = resolveStudentId(inputEl.value);
+            }
         }
 
         // ----------------------------------------------------
@@ -241,16 +275,19 @@
             } else {
                 const dept = document.getElementById("department").value;
                 const teacherName = document.getElementById("teacher").value;
-                const studentId = document.getElementById("studentIdRecord").value.trim();
+                const rawStudentId = document.getElementById("studentIdRecord").value.trim();
 
                 if (dept === "未選択" || teacherName === "未選択") {
                     alert("学科と担当の先生を選択してください。");
                     return;
                 }
-                if (!studentId) {
-                    alert("生徒ID（または名前）を入力してください。");
+                if (!rawStudentId) {
+                    alert("生徒ID（または氏名）を入力してください。");
                     return;
                 }
+
+                // 送信前に名前/IDの補正を実行
+                document.getElementById("studentIdRecord").value = resolveStudentId(rawStudentId);
                 startCamera();
             }
         }
@@ -299,7 +336,7 @@
 
                         const scannedVal = code.data.trim();
 
-                        // 先生用QRコードの完全一致判定
+                        // 先生用QRコード完全一致判定
                         if (scannedVal !== TEACHER_QR_TARGET) {
                             resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
                             resultDiv.innerText = "❌ 認証エラー: 正しい先生用QRコードではありません。";
@@ -311,7 +348,7 @@
                             return;
                         }
 
-                        // 完全一致した場合のみ送信処理へ移行
+                        // 完全一致した場合のみ送信処理
                         sendInterviewRecord(teacherName, studentId);
                         return;
                     }
@@ -393,14 +430,15 @@
         }
 
         async function addScheduleEvent() {
-            const studentId = document.getElementById('candidateName').value.trim();
+            const rawInput = document.getElementById('candidateName').value.trim();
             const dateVal = document.getElementById('interviewDate').value;
 
-            if (!studentId || !dateVal) {
+            if (!rawInput || !dateVal) {
                 alert('氏名/生徒IDと日時を入力してください。');
                 return;
             }
 
+            const studentId = resolveStudentId(rawInput);
             const btn = document.getElementById('submitDateBtn');
             btn.disabled = true;
             btn.innerText = "登録中...";
