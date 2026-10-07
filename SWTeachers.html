@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【先生用】面接練習回数・履歴管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .app2-container { display: flex; gap: 24px; }
+        .app2-left { flex: 1; min-width: 300px; }
+        .app2-right { flex: 1; min-width: 300px; }
+        .sortArea { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .sortArea select { padding: 5px 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #fff; }
+        .sortArea button { padding: 5px 12px; font-size: 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: 500; }
+        .sortArea button:hover { background: #e2e8f0; }
+        .app2-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+        .app2-table th, .app2-table td { border: 1px solid #cbd5e1; padding: 8px 10px; }
+        .app2-table th { background: #f8fafc; font-weight: 600; color: #334155; }
+        .student-cell { text-align: center; }
+        .student-link { color: #2563eb; cursor: pointer; text-decoration: underline; font-weight: 500; }
+        .student-link:hover { color: #1d4ed8; }
+        .count-cell { text-align: center; font-weight: 600; }
+        .exam-date-cell { text-align: center; }
+        .exam-active { font-weight: bold; color: #0f172a; }
+        .exam-finished { font-weight: normal; color: #64748b; }
+        #updateTime { color: #64748b; font-size: 12px; white-space: nowrap; }
+        #historyArea { border: 1px solid #e2e8f0; padding: 16px; min-height: 250px; background: #f8fafc; border-radius: 8px; }
+        #historyArea h2 { margin-top: 0; font-size: 1.1rem; font-weight: bold; margin-bottom: 12px; color: #0f172a; }
+        @media (max-width: 768px) {
+            .app2-container { flex-direction: column; }
+            .app2-left, .app2-right { width: 100%; min-width: 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col font-sans">
+
+    <header class="bg-slate-900 text-white py-3 px-4 sm:px-6 shadow-md flex items-center justify-between">
+        <h1 class="text-base sm:text-lg font-bold tracking-wide flex items-center gap-2">
+            <span>【先生用】生徒面接練習回数・履歴管理</span>
+        </h1>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-1 flex flex-col">
+        <div class="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm flex-1">
+            <h2 class="text-xl font-bold text-slate-900 text-center mb-6">面接練習回数・試験日一覧</h2>
+
+            <div class="app2-container">
+                <!-- 左側：生徒一覧 -->
+                <div class="app2-left">
+                    <div class="sortArea">
+                        <select id="sortSelect">
+                            <option value="id-asc">生徒ID順（昇順）</option>
+                            <option value="id-desc">生徒ID順（降順）</option>
+                            <option value="count-desc">回数順（多）</option>
+                            <option value="count-asc">回数順（少）</option>
+                            <option value="exam-asc">試験日順（近い順）</option>
+                            <option value="exam-desc">試験日順（遠い順）</option>
+                        </select>
+                        <button onclick="loadSummary()">🔄 更新</button>
+                        <span id="updateTime">読み込み中...</span>
+                    </div>
+
+                    <table class="app2-table">
+                        <thead>
+                            <tr>
+                                <th>試験日</th>
+                                <th>生徒名 / ID</th>
+                                <th>面接回数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody">
+                            <tr><td colspan="3" class="text-center py-4 text-slate-500">データを読み込んでいます...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 右側：個別面接履歴 -->
+                <div class="app2-right">
+                    <div id="historyArea">
+                        <h2>面接履歴</h2>
+                        <p class="text-slate-500 text-sm">左側のテーブルから生徒名（ID）をクリックすると、過去の面接練習履歴が表示されます。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
+
+        let students = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSummary();
+            document.getElementById("sortSelect").addEventListener("change", renderSummary);
+        });
+
+        function compareId(a, b) {
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        async function loadSummary() {
+            document.getElementById("updateTime").textContent = "更新中...";
+            try {
+                const summaryResponse = await fetch(GAS_URL + "?mode=summary");
+                const summaryData = await summaryResponse.json();
+
+                const examResponse = await fetch(GAS_URL + "?mode=examDates");
+                const examData = await examResponse.json();
+
+                students = [];
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                for (const studentName in summaryData) {
+                    const match = studentName.match(/\d+[a-zA-Z]\d+/);
+                    if (!match) continue;
+
+                    const studentId = match[0];
+                    const displayName = studentName.replace(studentId, "").trim();
+
+                    const examList = (examData[studentId] || []).filter(dateText => dateText && String(dateText).trim() !== "");
+
+                    const parsedExamDates = examList.map((dateText, index) => {
+                        const parts = String(dateText).split("/");
+                        if (parts.length !== 3) {
+                            return { text: dateText, date: null, daysUntil: null, originalIndex: index };
+                        }
+                        const year = Number(parts[0]);
+                        const month = Number(parts[1]);
+                        const day = Number(parts[2]);
+                        const examDate = new Date(year, month - 1, day);
+                        examDate.setHours(0, 0, 0, 0);
+
+                        const diff = examDate - today;
+                        const daysUntil = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+                        return {
+                            text: year + "/" + String(month).padStart(2, "0") + "/" + String(day).padStart(2, "0"),
+                            date: examDate,
+                            daysUntil: daysUntil,
+                            originalIndex: index
+                        };
+                    });
+
+                    const unfinishedDates = parsedExamDates.filter(item => item.daysUntil !== null && item.daysUntil >= 0);
+                    const nearestDateList = [...unfinishedDates].sort((a, b) => a.daysUntil - b.daysUntil);
+                    const farthestDateList = [...unfinishedDates].sort((a, b) => b.daysUntil - a.daysUntil);
+
+                    students.push({
+                        name: displayName,
+                        id: studentId,
+                        count: Number(summaryData[studentName]) || 0,
+                        examDates: parsedExamDates,
+                        nearestDateList: nearestDateList,
+                        farthestDateList: farthestDateList
+                    });
+                }
+
+                renderSummary();
+                const now = new Date();
+                document.getElementById("updateTime").textContent = "最終更新：" + now.toLocaleString("ja-JP");
+            } catch (error) {
+                console.error(error);
+                document.getElementById("summaryBody").innerHTML = "<tr><td colspan='3' class='text-red-500 text-center py-4'>データの取得に失敗しました。</td></tr>";
+            }
+        }
+
+        function renderSummary() {
+            const sortType = document.getElementById("sortSelect").value;
+            const tbody = document.getElementById("summaryBody");
+            tbody.innerHTML = "";
+
+            let sortedStudents = [...students];
+
+            if (sortType === "id-asc") {
+                sortedStudents.sort((a, b) => compareId(a.id, b.id));
+            } else if (sortType === "id-desc") {
+                sortedStudents.sort((a, b) => compareId(b.id, a.id));
+            } else if (sortType === "count-desc") {
+                sortedStudents.sort((a, b) => b.count !== a.count ? b.count - a.count : compareId(a.id, b.id));
+            } else if (sortType === "count-asc") {
+                sortedStudents.sort((a, b) => a.count !== b.count ? a.count - b.count : compareId(a.id, b.id));
+            }
+
+            sortedStudents.forEach(student => {
+                const tr = document.createElement("tr");
+
+                const examTd = document.createElement("td");
+                examTd.className = "exam-date-cell";
+                if (student.examDates.length === 0) {
+                    examTd.textContent = "未設定";
+                } else {
+                    student.examDates.forEach(exam => {
+                        const div = document.createElement("div");
+                        if (exam.daysUntil !== null && exam.daysUntil < 0) {
+                            div.className = "exam-finished";
+                            div.textContent = exam.text + " ✅";
+                        } else {
+                            div.className = "exam-active";
+                            div.textContent = exam.text;
+                        }
+                        examTd.appendChild(div);
+                    });
+                }
+
+                const nameTd = document.createElement("td");
+                nameTd.className = "student-cell";
+                const studentLink = document.createElement("span");
+                studentLink.className = "student-link";
+                studentLink.textContent = student.name + " " + student.id;
+                studentLink.onclick = () => showHistory(student.id, student.name + " " + student.id);
+                nameTd.appendChild(studentLink);
+
+                const countTd = document.createElement("td");
+                countTd.className = "count-cell";
+                countTd.textContent = student.count + "回";
+
+                tr.appendChild(examTd);
+                tr.appendChild(nameTd);
+                tr.appendChild(countTd);
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function showHistory(studentId, fullName) {
+            const historyArea = document.getElementById("historyArea");
+            historyArea.innerHTML = `<h2>${fullName} さんの面接履歴</h2><p class="text-slate-500">取得中...</p>`;
+
+            try {
+                const res = await fetch(`${GAS_URL}?mode=history&studentId=${studentId}`);
+                const historyList = await res.json();
+
+                if (!Array.isArray(historyList) || historyList.length === 0) {
+                    historyArea.innerHTML = `<h2>${fullName} さんの面接履歴</h2><p class="text-slate-500">面接練習記録はありません。</p>`;
+                    return;
+                }
+
+                let html = `<h2>${fullName} さんの面接履歴 (全${historyList.length}回)</h2>`;
+                html += `<ul class="space-y-2 mt-3">`;
+                historyList.forEach((item, index) => {
+                    html += `
+                        <li class="p-2.5 bg-white border border-slate-200 rounded-md text-sm flex justify-between items-center shadow-sm">
+                            <span class="font-bold text-slate-700">第${index + 1}回: ${item.datetime}</span>
+                            <span class="bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded font-medium">担当: ${item.teacher}先生</span>
+                        </li>
+                    `;
+                });
+                html += `</ul>`;
+                historyArea.innerHTML = html;
+            } catch (err) {
+                historyArea.innerHTML = `<h2>${fullName} さんの面接履歴</h2><p class="text-red-500">履歴の取得に失敗しました。</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
