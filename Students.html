@@ -8,11 +8,67 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+    <style>
+        @keyframes slideDown {
+            from { transform: translateY(-30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-down {
+            animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10">
 
     <!-- 生徒ID予測変換用の共通データリスト -->
     <datalist id="studentListOptions"></datalist>
+
+    <!-- ====================================================
+         最終確認ポップアップ (画面上部からのモーダル)
+    ==================================================== -->
+    <div id="confirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-start justify-center pt-8 sm:pt-16 px-4 transition-all">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-5 animate-slide-down">
+            <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <span class="text-xl">📋</span> 送信内容の最終確認
+                </h3>
+                <button onclick="closeConfirmModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold leading-none">&times;</button>
+            </div>
+            
+            <div class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
+                <div class="flex justify-between items-center border-b pb-2 border-slate-200">
+                    <span class="text-slate-500 font-medium">学科</span>
+                    <span id="modalDept" class="font-bold text-slate-800"></span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2 border-slate-200">
+                    <span class="text-slate-500 font-medium">担当の先生</span>
+                    <span id="modalTeacher" class="font-bold text-slate-800"></span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2 border-slate-200">
+                    <span class="text-slate-500 font-medium">生徒氏名 / ID</span>
+                    <span id="modalStudent" class="font-bold text-indigo-700"></span>
+                </div>
+                <div class="flex justify-between items-center pt-1">
+                    <span class="text-slate-500 font-medium">先生承認QR</span>
+                    <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
+                        ✓ 認証成功
+                    </span>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-500 text-center">上記の内容で面接練習記録を確定します。よろしいですか？</p>
+
+            <div class="flex gap-3 pt-1">
+                <button onclick="closeConfirmModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">
+                    やり直す
+                </button>
+                <button onclick="executeSubmit()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-colors flex items-center justify-center gap-1">
+                    <span>確定して送信</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 
     <header class="bg-indigo-900 text-white py-3 px-4 shadow-md text-center">
         <h1 class="text-lg font-bold tracking-wide">生徒面接サポートポータル</h1>
@@ -67,7 +123,7 @@
                 <!-- QR読み取りボタン -->
                 <div class="pt-2">
                     <button id="startScanBtn" onclick="toggleCamera()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
-                        <span>📷 先生のQRコードを読み取って確定送信</span>
+                        <span>先生のQRコードを読み取って確認送信</span>
                     </button>
                 </div>
 
@@ -128,6 +184,9 @@
         let video = document.createElement("video");
         let calendar;
 
+        // 一時保留用の送信データ
+        let pendingSubmission = null;
+
         document.addEventListener('DOMContentLoaded', async () => {
             loadTeachers();
             fetchStudentMaster();
@@ -186,34 +245,54 @@
             const query = inputText.trim();
             if (!query) return '';
 
-            // 1. 完全一致
             const exactMatch = masterStudentList.find(item => item === query);
             if (exactMatch) return exactMatch;
 
             const clean = (str) => str.replace(/\s+/g, '').toLowerCase();
             const cleanedQuery = clean(query);
 
-            // 2. 空白無関係で一致
             const spaceIgnoreMatch = masterStudentList.find(item => clean(item) === cleanedQuery);
             if (spaceIgnoreMatch) return spaceIgnoreMatch;
 
-            // 3. 名前から始まる場合
             const startsWithMatch = masterStudentList.find(item => clean(item).startsWith(cleanedQuery));
             if (startsWithMatch) return startsWithMatch;
 
-            // 4. 名前の一部が含まれる場合
             const includesMatch = masterStudentList.find(item => clean(item).includes(cleanedQuery));
             if (includesMatch) return includesMatch;
 
             return query;
         }
 
-        // 入力欄を離れた時に自動補正する処理
         function autoResolveInput(elementId) {
             const inputEl = document.getElementById(elementId);
             if (inputEl && inputEl.value.trim()) {
                 inputEl.value = resolveStudentId(inputEl.value);
             }
+        }
+
+        // ----------------------------------------------------
+        // モーダル（最終確認ポップアップ）制御
+        // ----------------------------------------------------
+        function openConfirmModal(dept, teacherName, studentId) {
+            pendingSubmission = { teacherName, studentId };
+
+            document.getElementById('modalDept').textContent = dept;
+            document.getElementById('modalTeacher').textContent = teacherName + " 先生";
+            document.getElementById('modalStudent').textContent = studentId;
+
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            pendingSubmission = null;
+        }
+
+        function executeSubmit() {
+            if (!pendingSubmission) return;
+            const { teacherName, studentId } = pendingSubmission;
+            closeConfirmModal();
+            sendInterviewRecord(teacherName, studentId);
         }
 
         // ----------------------------------------------------
@@ -286,7 +365,6 @@
                     return;
                 }
 
-                // 送信前に名前/IDの補正を実行
                 document.getElementById("studentIdRecord").value = resolveStudentId(rawStudentId);
                 startCamera();
             }
@@ -331,12 +409,13 @@
 
                     if (code && !isProcessing) {
                         isProcessing = true;
+                        const dept = document.getElementById("department").value;
                         const teacherName = document.getElementById("teacher").value;
                         const studentId = document.getElementById("studentIdRecord").value.trim();
 
                         const scannedVal = code.data.trim();
 
-                        // 先生用QRコード完全一致判定
+                        // 先生用QRコードの完全一致判定
                         if (scannedVal !== TEACHER_QR_TARGET) {
                             resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
                             resultDiv.innerText = "❌ 認証エラー: 正しい先生用QRコードではありません。";
@@ -348,8 +427,9 @@
                             return;
                         }
 
-                        // 完全一致した場合のみ送信処理
-                        sendInterviewRecord(teacherName, studentId);
+                        // 完全一致時：カメラを止め、上部からの確認ポップアップを開く
+                        stopCamera();
+                        openConfirmModal(dept, teacherName, studentId);
                         return;
                     }
                 }
@@ -368,12 +448,11 @@
             }
             document.getElementById("cameraContainer").classList.add("hidden");
             const startBtn = document.getElementById("startScanBtn");
-            startBtn.innerHTML = "<span>📷 先生のQRコードを読み取って確定送信</span>";
+            startBtn.innerHTML = "<span>📷 先生のQRコードを読み取って確認送信</span>";
             startBtn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2";
         }
 
         function sendInterviewRecord(teacherName, studentId) {
-            stopCamera();
             const resultDiv = document.getElementById("recordResult");
             resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-blue-50 text-blue-700 border border-blue-200 mt-3";
             resultDiv.innerText = "送信中...";
