@@ -23,9 +23,7 @@
     <!-- 生徒ID予測変換用の共通データリスト -->
     <datalist id="studentListOptions"></datalist>
 
-    <!-- ====================================================
-         最終確認ポップアップ (画面上部からのモーダル)
-    ==================================================== -->
+    <!-- 最終確認ポップアップ -->
     <div id="confirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-start justify-center pt-8 sm:pt-16 px-4 transition-all">
         <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-5 animate-slide-down">
             <div class="flex items-center justify-between border-b pb-3 border-slate-100">
@@ -69,14 +67,13 @@
         </div>
     </div>
 
-
     <header class="bg-indigo-900 text-white py-3 px-4 shadow-md text-center">
         <h1 class="text-lg font-bold tracking-wide">生徒面接サポートポータル</h1>
     </header>
 
     <main class="max-w-3xl mx-auto p-4 sm:p-6">
 
-        <!-- セグメントタブコントロール -->
+        <!-- タブコントロール -->
         <div class="flex p-1.5 bg-slate-200/80 rounded-xl mb-6 shadow-inner">
             <button id="tab-btn-record" onclick="switchTab('record')" 
                     class="flex-1 py-2.5 px-3 rounded-lg font-bold text-sm text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-2">
@@ -88,12 +85,11 @@
             </button>
         </div>
 
-
-        <!-- TAB 1: 面接練習記録（先生のQR承認機能） -->
+        <!-- TAB 1: 面接練習記録 -->
         <div id="panel-record" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-5">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 mb-1">面接練習の完了記録</h2>
-                <p class="text-xs text-slate-500">面接練習が終わったら、必要事項を入力の上、先生のQRコードを読み取ってください。</p>
+                <p class="text-xs text-slate-500">面接練習が終わったら、必要事項を入力の上、先生の画面に表示されているQRコードを読み取ってください。</p>
             </div>
 
             <div class="space-y-4 pt-2">
@@ -113,23 +109,23 @@
                     </select>
                 </div>
 
-                <!-- 生徒ID入力（予測変換・補正対応） -->
+                <!-- 生徒ID入力 -->
                 <div>
                     <label for="studentIdRecord" class="block text-sm font-semibold text-slate-700 mb-1">③ あなたの氏名・生徒ID</label>
-                    <input type="text" id="studentIdRecord" list="studentListOptions" onblur="autoResolveInput('studentIdRecord')" placeholder="名前またはIDを入力（出席番号2桁でも検索可）" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <input type="text" id="studentIdRecord" list="studentListOptions" onblur="autoResolveInput('studentIdRecord')" placeholder="名前またはIDを入力" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                     <p class="text-xs text-slate-500 mt-1">※名前を入力すると予測変換が出ます。</p>
                 </div>
 
                 <!-- QR読み取りボタン -->
                 <div class="pt-2">
                     <button id="startScanBtn" onclick="toggleCamera()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
-                        <span>先生のQRコードを読み取って確認送信</span>
+                        <span>📷 先生のQRコードを読み取って確認送信</span>
                     </button>
                 </div>
 
-                <!-- カメラ表示エリア -->
+                <!-- カメラエリア -->
                 <div id="cameraContainer" class="hidden text-center space-y-2 mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p class="text-sm font-bold text-indigo-700">先生が持っている承認用QRコードをカメラにかざしてください</p>
+                    <p class="text-sm font-bold text-indigo-700">先生の画面に表示されている承認QRコードをかざしてください</p>
                     <canvas id="canvas" class="w-full max-w-sm mx-auto border-2 border-indigo-500 rounded-lg bg-black"></canvas>
                 </div>
 
@@ -138,8 +134,7 @@
             </div>
         </div>
 
-
-        <!-- TAB 2: 面接本番スケジュール登録＆カレンダー -->
+        <!-- TAB 2: スケジュール -->
         <div id="panel-schedule" class="hidden bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-6">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 mb-1">面接本番スケジュールの登録</h2>
@@ -162,7 +157,6 @@
                 </button>
             </div>
 
-            <!-- カレンダー -->
             <div class="mt-6 border border-slate-200 rounded-lg p-2 bg-white">
                 <div id="calendar"></div>
             </div>
@@ -173,18 +167,16 @@
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
         
-        // 許可する先生用QRコードの文字列（完全一致）
-        const TEACHER_QR_TARGET = "https://qr.generatorqr.com/Aj2wN9B4S";
+        // ★URLではなく、シンプルなテキストコードで判定（短いためQRコードの読み取りが非常に早くなります）
+        const TEACHER_QR_TARGET = "TEACHER_OK";
 
-        let masterStudentList = []; // 生徒マスター（氏名+ID）配列
+        let masterStudentList = [];
         let teacherDataMap = {};
         let isCameraRunning = false;
         let localStream = null;
         let animationFrameId = null;
         let video = document.createElement("video");
         let calendar;
-
-        // 一時保留用の送信データ
         let pendingSubmission = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -192,7 +184,6 @@
             fetchStudentMaster();
             initCalendar();
 
-            // 学科選択連動
             document.getElementById("department").addEventListener("change", function() {
                 const selectedDept = this.value;
                 const teacherSelect = document.getElementById("teacher");
@@ -216,9 +207,6 @@
             });
         });
 
-        // ----------------------------------------------------
-        // 生徒マスター取得＆予測変換datalist構築
-        // ----------------------------------------------------
         async function fetchStudentMaster() {
             try {
                 const res = await fetch(GAS_WEB_APP_URL + "?mode=students");
@@ -240,7 +228,6 @@
             }
         }
 
-        // 名前入力をマスターの「名前+ID」の形に判定・変換する補正ロジック
         function resolveStudentId(inputText) {
             const query = inputText.trim();
             if (!query) return '';
@@ -270,16 +257,11 @@
             }
         }
 
-        // ----------------------------------------------------
-        // モーダル（最終確認ポップアップ）制御
-        // ----------------------------------------------------
         function openConfirmModal(dept, teacherName, studentId) {
             pendingSubmission = { teacherName, studentId };
-
             document.getElementById('modalDept').textContent = dept;
             document.getElementById('modalTeacher').textContent = teacherName + " 先生";
             document.getElementById('modalStudent').textContent = studentId;
-
             document.getElementById('confirmModal').classList.remove('hidden');
         }
 
@@ -295,9 +277,6 @@
             sendInterviewRecord(teacherName, studentId);
         }
 
-        // ----------------------------------------------------
-        // タブ切り替え機能
-        // ----------------------------------------------------
         function switchTab(target) {
             const btnRecord = document.getElementById('tab-btn-record');
             const btnSchedule = document.getElementById('tab-btn-schedule');
@@ -314,21 +293,14 @@
                 btnSchedule.className = inactiveClass;
             } else {
                 if (isCameraRunning) stopCamera();
-
                 panelSchedule.classList.remove('hidden');
                 panelRecord.classList.add('hidden');
                 btnSchedule.className = activeClass;
                 btnRecord.className = inactiveClass;
-
-                if (calendar) {
-                    setTimeout(() => calendar.updateSize(), 50);
-                }
+                if (calendar) setTimeout(() => calendar.updateSize(), 50);
             }
         }
 
-        // ----------------------------------------------------
-        // 1. 面接練習記録（先生承認スキャン）機能
-        // ----------------------------------------------------
         function loadTeachers() {
             const deptSelect = document.getElementById("department");
             fetch(GAS_WEB_APP_URL + "?mode=teachers")
@@ -415,10 +387,10 @@
 
                         const scannedVal = code.data.trim();
 
-                        // 先生用QRコードの完全一致判定
+                        // ★文字コードの一致判定
                         if (scannedVal !== TEACHER_QR_TARGET) {
                             resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
-                            resultDiv.innerText = "❌ 認証エラー: 正しい先生用QRコードではありません。";
+                            resultDiv.innerHTML = `❌ 認証エラー: 正しい先生用承認QRコードではありません。`;
                             resultDiv.classList.remove("hidden");
 
                             setTimeout(() => {
@@ -427,7 +399,7 @@
                             return;
                         }
 
-                        // 完全一致時：カメラを止め、上部からの確認ポップアップを開く
+                        // 完全一致時：カメラ停止 & 確認モーダル開く
                         stopCamera();
                         openConfirmModal(dept, teacherName, studentId);
                         return;
@@ -480,9 +452,6 @@
             });
         }
 
-        // ----------------------------------------------------
-        // 2. 面接本番スケジュール機能
-        // ----------------------------------------------------
         function initCalendar() {
             const now = new Date();
             now.setHours(now.getHours() + 1, 0, 0, 0);
