@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生徒面接サポートポータル</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
     <style>
@@ -46,15 +45,9 @@
                     <span class="text-slate-500 font-medium">生徒氏名 / ID</span>
                     <span id="modalStudent" class="font-bold text-indigo-700"></span>
                 </div>
-                <div class="flex justify-between items-start border-b pb-2 border-slate-200">
+                <div class="flex justify-between items-start pt-1">
                     <span class="text-slate-500 font-medium shrink-0">感想・振り返り</span>
                     <span id="modalImpression" class="font-bold text-slate-800 text-right whitespace-pre-wrap pl-2 text-xs"></span>
-                </div>
-                <div class="flex justify-between items-center pt-1">
-                    <span class="text-slate-500 font-medium">先生承認QR</span>
-                    <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1">
-                        ✓ 認証成功
-                    </span>
                 </div>
             </div>
 
@@ -81,7 +74,7 @@
         <div class="flex p-1.5 bg-slate-200/80 rounded-xl mb-6 shadow-inner">
             <button id="tab-btn-record" onclick="switchTab('record')" 
                     class="flex-1 py-2.5 px-3 rounded-lg font-bold text-sm text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-2">
-                <span>📝 面接完了記録（QR）</span>
+                <span>📝 面接完了記録</span>
             </button>
             <button id="tab-btn-schedule" onclick="switchTab('schedule')" 
                     class="flex-1 py-2.5 px-3 rounded-lg font-semibold text-sm text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-2">
@@ -93,7 +86,7 @@
         <div id="panel-record" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-5">
             <div>
                 <h2 class="text-lg font-bold text-slate-900 mb-1">面接練習の完了記録</h2>
-                <p class="text-xs text-slate-500">面接練習が終わったら、必要事項を入力の上、先生の画面に表示されているQRコードを読み取ってください。</p>
+                <p class="text-xs text-slate-500">面接練習が終わったら、必要事項を入力の上、送信ボタンを押してください。</p>
             </div>
 
             <div class="space-y-4 pt-2">
@@ -120,23 +113,17 @@
                     <p class="text-xs text-slate-500 mt-1">※名前を入力すると予測変換が出ます。</p>
                 </div>
 
-                <!-- 感想文入力欄（追加） -->
+                <!-- 感想文入力欄 -->
                 <div>
                     <label for="impression" class="block text-sm font-semibold text-slate-700 mb-1">④ 面接練習の感想・振り返り</label>
                     <textarea id="impression" rows="3" placeholder="上手くいった点、アドバイスされたこと、今後の課題などを入力してください" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>
                 </div>
 
-                <!-- QR読み取りボタン -->
+                <!-- 送信確認ボタン -->
                 <div class="pt-2">
-                    <button id="startScanBtn" onclick="toggleCamera()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
-                        <span>📷 先生のQRコードを読み取って確認送信</span>
+                    <button id="startScanBtn" onclick="handleRecordSubmit()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2">
+                        <span>📤 送信内容を確認する</span>
                     </button>
-                </div>
-
-                <!-- カメラエリア -->
-                <div id="cameraContainer" class="hidden text-center space-y-2 mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <p class="text-sm font-bold text-indigo-700">先生の画面に表示されている承認QRコードをかざしてください</p>
-                    <canvas id="canvas" class="w-full max-w-sm mx-auto border-2 border-indigo-500 rounded-lg bg-black"></canvas>
                 </div>
 
                 <!-- 結果メッセージ -->
@@ -176,15 +163,9 @@
 
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
-        
-        const TEACHER_QR_TARGET = "TEACHER_OK";
 
         let masterStudentList = [];
         let teacherDataMap = {};
-        let isCameraRunning = false;
-        let localStream = null;
-        let animationFrameId = null;
-        let video = document.createElement("video");
         let calendar;
         let pendingSubmission = null;
 
@@ -266,6 +247,31 @@
             }
         }
 
+        function handleRecordSubmit() {
+            const dept = document.getElementById("department").value;
+            const teacherName = document.getElementById("teacher").value;
+            const rawStudentId = document.getElementById("studentIdRecord").value.trim();
+            const impression = document.getElementById("impression").value.trim();
+
+            if (dept === "未選択" || teacherName === "未選択") {
+                alert("学科と担当の先生を選択してください。");
+                return;
+            }
+            if (!rawStudentId) {
+                alert("生徒ID（または氏名）を入力してください。");
+                return;
+            }
+            if (!impression) {
+                alert("感想・振り返りを入力してください。");
+                return;
+            }
+
+            const resolvedStudentId = resolveStudentId(rawStudentId);
+            document.getElementById("studentIdRecord").value = resolvedStudentId;
+
+            openConfirmModal(dept, teacherName, resolvedStudentId, impression);
+        }
+
         function openConfirmModal(dept, teacherName, studentId, impression) {
             pendingSubmission = { teacherName, studentId, impression };
             document.getElementById('modalDept').textContent = dept;
@@ -302,7 +308,6 @@
                 btnRecord.className = activeClass;
                 btnSchedule.className = inactiveClass;
             } else {
-                if (isCameraRunning) stopCamera();
                 panelSchedule.classList.remove('hidden');
                 panelRecord.classList.add('hidden');
                 btnSchedule.className = activeClass;
@@ -328,114 +333,6 @@
                     }
                 })
                 .catch(err => console.error("先生リスト取得失敗:", err));
-        }
-
-        function toggleCamera() {
-            if (isCameraRunning) {
-                stopCamera();
-            } else {
-                const dept = document.getElementById("department").value;
-                const teacherName = document.getElementById("teacher").value;
-                const rawStudentId = document.getElementById("studentIdRecord").value.trim();
-                const impression = document.getElementById("impression").value.trim();
-
-                if (dept === "未選択" || teacherName === "未選択") {
-                    alert("学科と担当の先生を選択してください。");
-                    return;
-                }
-                if (!rawStudentId) {
-                    alert("生徒ID（または氏名）を入力してください。");
-                    return;
-                }
-                if (!impression) {
-                    alert("感想・振り返りを入力してください。");
-                    return;
-                }
-
-                document.getElementById("studentIdRecord").value = resolveStudentId(rawStudentId);
-                startCamera();
-            }
-        }
-
-        function startCamera() {
-            const canvasElement = document.getElementById("canvas");
-            const canvas = canvasElement.getContext("2d", { willReadFrequently: true });
-            const container = document.getElementById("cameraContainer");
-            const startBtn = document.getElementById("startScanBtn");
-            const resultDiv = document.getElementById("recordResult");
-
-            container.classList.remove("hidden");
-            resultDiv.classList.add("hidden");
-            startBtn.innerHTML = "<span>❌ カメラを閉じる</span>";
-            startBtn.className = "w-full bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2";
-            isCameraRunning = true;
-
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
-                localStream = stream;
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true);
-                video.play();
-                animationFrameId = requestAnimationFrame(tick);
-            }).catch(err => {
-                alert("カメラ起動エラー: " + err.message);
-                stopCamera();
-            });
-
-            let isProcessing = false;
-
-            function tick() {
-                if (!isCameraRunning) return;
-
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvasElement.height = video.videoHeight;
-                    canvasElement.width = video.videoWidth;
-                    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-
-                    const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-
-                    if (code && !isProcessing) {
-                        isProcessing = true;
-                        const dept = document.getElementById("department").value;
-                        const teacherName = document.getElementById("teacher").value;
-                        const studentId = document.getElementById("studentIdRecord").value.trim();
-                        const impression = document.getElementById("impression").value.trim();
-
-                        const scannedVal = code.data.trim();
-
-                        if (scannedVal !== TEACHER_QR_TARGET) {
-                            resultDiv.className = "p-4 rounded-lg text-sm font-bold bg-red-50 text-red-800 border border-red-300 mt-3";
-                            resultDiv.innerHTML = `❌ 認証エラー: 正しい先生用承認QRコードではありません。`;
-                            resultDiv.classList.remove("hidden");
-
-                            setTimeout(() => {
-                                isProcessing = false;
-                            }, 2000);
-                            return;
-                        }
-
-                        stopCamera();
-                        openConfirmModal(dept, teacherName, studentId, impression);
-                        return;
-                    }
-                }
-                if (isCameraRunning) {
-                    animationFrameId = requestAnimationFrame(tick);
-                }
-            }
-        }
-
-        function stopCamera() {
-            isCameraRunning = false;
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            document.getElementById("cameraContainer").classList.add("hidden");
-            const startBtn = document.getElementById("startScanBtn");
-            startBtn.innerHTML = "<span>📷 先生のQRコードを読み取って確認送信</span>";
-            startBtn.className = "w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors flex items-center justify-center gap-2";
         }
 
         function sendInterviewRecord(teacherName, studentId, impression) {
