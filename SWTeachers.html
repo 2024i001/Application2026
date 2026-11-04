@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>生徒面接サポートポータル【先生用】</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- QRコード生成ライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         /* タブ非表示クラス */
         .tab-content.hidden { display: none; }
@@ -62,27 +60,18 @@
     <!-- メイン領域 -->
     <main class="max-w-7xl w-full mx-auto p-3 sm:p-5 flex-1 flex flex-col">
 
-        <!-- SWinTeacherと完全に一致させたセグメントタブコントロール（パネルと隙間なしで接続） -->
+        <!-- セグメントタブコントロール -->
         <div class="flex items-center justify-between flex-wrap gap-2 -mb-px relative z-10">
             <div class="inline-flex p-1 bg-slate-200/90 rounded-t-xl text-xs sm:text-sm font-medium">
-                <!-- タブ1: 面接回数・履歴一覧 -->
-                <button id="tab-btn-summary" onclick="switchTab('summary')" 
-                        class="px-4 py-1.5 rounded-lg font-semibold text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center gap-1.5">
+                <button id="tab-btn-summary" 
+                        class="px-4 py-1.5 rounded-lg font-semibold text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center gap-1.5 cursor-default">
                     <span>面接回数・履歴一覧</span>
                     <span class="text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">一覧表示</span>
-                </button>
-                <!-- タブ2: 承認用QRコード表示 -->
-                <button id="tab-btn-qrcode" onclick="switchTab('qrcode')" 
-                        class="px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-1.5">
-                    <span>承認用QRコード表示</span>
-                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium">QR表示</span>
                 </button>
             </div>
         </div>
 
-        <!-- 各表示エリア -->
-
-        <!-- ▼▼▼ TAB 1: 面接回数・履歴一覧（SWinTeacher完全再現レイアウト） ▼▼▼ -->
+        <!-- 面接回数・履歴一覧 -->
         <div id="panel-summary" class="tab-content bg-white p-4 sm:p-6 rounded-b-xl rounded-tr-xl border border-slate-200 shadow-sm flex-1">
             <h1 class="app2-page-title">面接練習回数一覧</h1>
 
@@ -124,89 +113,18 @@
                 </div>
             </div>
         </div>
-        <!-- ▲▲▲ TAB 1 終了 ▲▲▲ -->
-
-        <!-- ▼▼▼ TAB 2: 生徒提示用 承認QRコード表示 ▼▼▼ -->
-        <div id="panel-qrcode" class="tab-content hidden bg-white p-4 sm:p-6 rounded-b-xl rounded-tr-xl border border-slate-200 shadow-sm flex-1">
-            <div class="max-w-md mx-auto text-center space-y-4 py-4">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900 mb-1">先生承認用 QRコード</h2>
-                    <p class="text-xs text-slate-500">生徒がスマホで面接完了記録を送る際、この画面を提示してカメラで読み取らせてください。</p>
-                </div>
-
-                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center space-y-3">
-                    <div id="qrcode" class="p-4 bg-white rounded-2xl shadow-md border border-slate-100"></div>
-                    <p class="text-xs text-slate-400 font-mono" id="qrCodeText"></p>
-                </div>
-
-                <p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl font-medium">
-                    💡 短い承認コードで生成されているため、暗い場所や遠くからでも素早くスキャンできます。
-                </p>
-            </div>
-        </div>
-        <!-- ▲▲▲ TAB 2 終了 ▲▲▲ -->
 
     </main>
 
     <!-- JavaScript -->
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
-        
-        // ★生徒側に読み取らせるシンプルな認証テキスト
-        const TEACHER_QR_TARGET = "TEACHER_OK";
 
         let studentsData = [];
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSummary();
-            initQRCode();
         });
-
-        // ----------------------------------------------------
-        // 承認用QRコード生成
-        // ----------------------------------------------------
-        function initQRCode() {
-            document.getElementById("qrCodeText").textContent = `CODE: ${TEACHER_QR_TARGET}`;
-            const qrContainer = document.getElementById("qrcode");
-            qrContainer.innerHTML = "";
-            new QRCode(qrContainer, {
-                text: TEACHER_QR_TARGET,
-                width: 220,
-                height: 220,
-                colorDark : "#0f172a",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.M
-            });
-        }
-
-        // ----------------------------------------------------
-        // タブ切り替え（SWinTeacherスタイルのアクティブ・非アクティブクラス切り替え）
-        // ----------------------------------------------------
-        function switchTab(target) {
-            const btnSummary = document.getElementById('tab-btn-summary');
-            const btnQrcode = document.getElementById('tab-btn-qrcode');
-
-            const panelSummary = document.getElementById('panel-summary');
-            const panelQrcode = document.getElementById('panel-qrcode');
-
-            const activeClass = "px-4 py-1.5 rounded-lg font-semibold text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center gap-1.5";
-            const inactiveClass = "px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-1.5";
-
-            panelSummary.classList.add('hidden');
-            panelQrcode.classList.add('hidden');
-
-            btnSummary.className = inactiveClass;
-            btnQrcode.className = inactiveClass;
-
-            if (target === 'summary') {
-                panelSummary.classList.remove('hidden');
-                btnSummary.className = activeClass;
-                loadSummary();
-            } else if (target === 'qrcode') {
-                panelQrcode.classList.remove('hidden');
-                btnQrcode.className = activeClass;
-            }
-        }
 
         // ----------------------------------------------------
         // 集計・履歴表示ロジック
