@@ -8,120 +8,147 @@
     <!-- QRコード生成ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        .exam-active { font-weight: bold; color: #0f172a; }
-        .exam-finished { font-weight: normal; color: #64748b; }
+        /* タブ非表示クラス */
+        .tab-content.hidden { display: none; }
 
-        /* SWinTeacher の面接履歴テーブルスタイル */
+        /* ========================================
+           SWinTeacher スタイル
+        ======================================== */
+        .app2-page-title {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.35rem;
+            font-weight: bold;
+            color: #0f172a;
+        }
+        .app2-container { display: flex; gap: 24px; }
+        .app2-left { flex: 1; min-width: 300px; }
+        .app2-right { flex: 1; min-width: 300px; }
+        .sortArea { margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .sortArea select { padding: 5px 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #fff; }
+        .sortArea input { padding: 5px 10px; font-size: 14px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: #fff; }
+        .sortArea button { padding: 5px 12px; font-size: 14px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; font-weight: 500; }
+        .sortArea button:hover { background: #e2e8f0; }
         .app2-table { border-collapse: collapse; width: 100%; font-size: 14px; background-color: #ffffff; }
         .app2-table th, .app2-table td { border: 1px solid #cbd5e1; padding: 8px 10px; }
         .app2-table th { background: #f8fafc; font-weight: 600; color: #334155; }
+        .student-cell { text-align: center; }
+        .student-link { color: #2563eb; cursor: pointer; text-decoration: underline; font-weight: 500; }
+        .student-link:hover { color: #1d4ed8; }
+        .count-cell { text-align: center; font-weight: 600; }
+        .exam-date-cell { text-align: center; }
+        .exam-active { font-weight: bold; color: #0f172a; }
+        .exam-finished { font-weight: normal; color: #64748b; }
+        #updateTime { color: #64748b; font-size: 12px; white-space: nowrap; }
+        #historyArea { border: 1px solid #e2e8f0; padding: 12px; min-height: 250px; background: #f8fafc; border-radius: 8px; }
         #historyArea h2 { margin-top: 0; font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #0f172a; }
+
+        /* レスポンシブ調整 */
+        @media (max-width: 768px) {
+            .app2-container { flex-direction: column; }
+            .app2-left, .app2-right { width: 100%; min-width: 0; }
+        }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10 flex flex-col">
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col font-sans">
 
-    <!-- ヘッダー -->
-    <header class="bg-slate-900 text-white py-3 px-4 shadow-md text-center">
-        <h1 class="text-lg font-bold tracking-wide flex items-center justify-center gap-2">
+    <!-- ヘッダー（SWinTeacherスタイルのスリムヘッダー） -->
+    <header class="bg-slate-900 text-white py-2.5 px-4 sm:px-6 shadow-md flex items-center justify-between">
+        <h1 class="text-base sm:text-lg font-bold tracking-wide flex items-center gap-2">
             <span>🎓 生徒面接サポートポータル【先生用】</span>
         </h1>
     </header>
 
-    <main class="max-w-6xl w-full mx-auto p-4 sm:p-6 flex-1">
+    <!-- メイン領域 -->
+    <main class="max-w-7xl w-full mx-auto p-3 sm:p-5 flex-1 flex flex-col">
 
-        <!-- タブコントロール -->
-        <div class="flex p-1.5 bg-slate-200/80 rounded-xl mb-6 shadow-inner max-w-md mx-auto">
-            <button id="tab-btn-summary" onclick="switchTab('summary')" 
-                    class="flex-1 py-2.5 px-3 rounded-lg font-bold text-sm text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-2">
-                <span>📊 面接回数・履歴一覧</span>
-            </button>
-            <button id="tab-btn-qrcode" onclick="switchTab('qrcode')" 
-                    class="flex-1 py-2.5 px-3 rounded-lg font-semibold text-sm text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-2">
-                <span>📱 承認用QRコード表示</span>
-            </button>
+        <!-- SWinTeacherと完全に一致させたセグメントタブコントロール（パネルと隙間なしで接続） -->
+        <div class="flex items-center justify-between flex-wrap gap-2 -mb-px relative z-10">
+            <div class="inline-flex p-1 bg-slate-200/90 rounded-t-xl text-xs sm:text-sm font-medium">
+                <!-- タブ1: 面接回数・履歴一覧 -->
+                <button id="tab-btn-summary" onclick="switchTab('summary')" 
+                        class="px-4 py-1.5 rounded-lg font-semibold text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center gap-1.5">
+                    <span>面接回数・履歴一覧</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-bold">一覧表示</span>
+                </button>
+                <!-- タブ2: 承認用QRコード表示 -->
+                <button id="tab-btn-qrcode" onclick="switchTab('qrcode')" 
+                        class="px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-1.5">
+                    <span>承認用QRコード表示</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium">QR表示</span>
+                </button>
+            </div>
         </div>
 
-        <!-- ====================================================
-             TAB 1: 面接回数・履歴一覧
-        ==================================================== -->
-        <div id="panel-summary" class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-4 border-slate-100">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-900">面接練習実施状況一覧</h2>
-                    <p class="text-xs text-slate-500">生徒ごとの面接回数と試験日程を確認できます。名前をクリックすると詳細履歴を表示します。</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="refreshData()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 border border-slate-300">
-                        <span>🔄</span> 更新
-                    </button>
-                    <span id="updateTime" class="text-xs text-slate-400">更新中...</span>
-                </div>
-            </div>
+        <!-- 各表示エリア -->
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- ▼▼▼ TAB 1: 面接回数・履歴一覧（SWinTeacher完全再現レイアウト） ▼▼▼ -->
+        <div id="panel-summary" class="tab-content bg-white p-4 sm:p-6 rounded-b-xl rounded-tr-xl border border-slate-200 shadow-sm flex-1">
+            <h1 class="app2-page-title">面接練習回数一覧</h1>
+
+            <div class="app2-container">
                 <!-- 左側：一覧テーブル -->
-                <div class="lg:col-span-2 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="flex items-center gap-2">
-                            <label class="text-xs font-bold text-slate-600">並び順:</label>
-                            <select id="sortSelect" onchange="renderSummary()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white font-medium focus:ring-2 focus:ring-indigo-500">
-                                <option value="id-asc">生徒ID順（昇順）</option>
-                                <option value="id-desc">生徒ID順（降順）</option>
-                                <option value="count-desc">面接回数順（多い順）</option>
-                                <option value="count-asc">面接回数順（少ない順）</option>
-                                <option value="exam-asc">試験日順（近い順）</option>
-                                <option value="exam-desc">試験日順（遠い順）</option>
-                            </select>
-                        </div>
-                        <input type="text" id="searchInput" oninput="renderSummary()" placeholder="生徒名・IDで絞り込み..." class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 w-48 focus:ring-2 focus:ring-indigo-500">
+                <div class="app2-left">
+                    <div class="sortArea">
+                        <select id="sortSelect" onchange="renderSummary()">
+                            <option value="id-asc">生徒ID順（昇順）</option>
+                            <option value="id-desc">生徒ID順（降順）</option>
+                            <option value="count-desc">面接回数順（多い順）</option>
+                            <option value="count-asc">面接回数順（少ない順）</option>
+                            <option value="exam-asc">試験日順（近い順）</option>
+                            <option value="exam-desc">試験日順（遠い順）</option>
+                        </select>
+                        <input type="text" id="searchInput" oninput="renderSummary()" placeholder="生徒名・IDで絞り込み...">
+                        <button onclick="refreshData()">🔄 更新</button>
+                        <span id="updateTime">更新中...</span>
                     </div>
 
-                    <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-[550px]">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0">
-                                <tr>
-                                    <th class="py-2.5 px-3 text-center w-36">試験日</th>
-                                    <th class="py-2.5 px-3">生徒名 / ID</th>
-                                    <th class="py-2.5 px-3 text-center w-24">面接回数</th>
-                                </tr>
-                            </thead>
-                            <tbody id="summaryBody" class="divide-y divide-slate-100 bg-white">
-                                <tr><td colspan="3" class="py-8 text-center text-slate-400">データを読み込んでいます...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <table class="app2-table">
+                        <thead>
+                            <tr>
+                                <th>試験日</th>
+                                <th>生徒名 / ID</th>
+                                <th>面接回数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody">
+                            <tr><td colspan="3" class="text-center py-4 text-slate-400">データを読み込んでいます...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- 右側：詳細履歴エリア（SWinTeacherのスタイルを適用） -->
-                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 h-fit">
-                    <div id="historyArea" class="text-xs text-slate-500 min-h-[250px]">
-                        生徒IDをクリックしてください。
-                    </div>
+                <!-- 右側：詳細履歴 -->
+                <div class="app2-right">
+                    <h2>面接履歴</h2>
+                    <div id="historyArea">生徒IDをクリックしてください。</div>
                 </div>
             </div>
         </div>
+        <!-- ▲▲▲ TAB 1 終了 ▲▲▲ -->
 
-        <!-- ====================================================
-             TAB 2: 生徒提示用 承認QRコード表示
-        ==================================================== -->
-        <div id="panel-qrcode" class="hidden max-w-md mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
-            <div>
-                <h2 class="text-lg font-bold text-slate-900 mb-1">先生承認用 QRコード</h2>
-                <p class="text-xs text-slate-500">生徒がスマホで面接完了記録を送る際、この画面を提示してカメラで読み取らせてください。</p>
+        <!-- ▼▼▼ TAB 2: 生徒提示用 承認QRコード表示 ▼▼▼ -->
+        <div id="panel-qrcode" class="tab-content hidden bg-white p-4 sm:p-6 rounded-b-xl rounded-tr-xl border border-slate-200 shadow-sm flex-1">
+            <div class="max-w-md mx-auto text-center space-y-4 py-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 mb-1">先生承認用 QRコード</h2>
+                    <p class="text-xs text-slate-500">生徒がスマホで面接完了記録を送る際、この画面を提示してカメラで読み取らせてください。</p>
+                </div>
+
+                <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center space-y-3">
+                    <div id="qrcode" class="p-4 bg-white rounded-2xl shadow-md border border-slate-100"></div>
+                    <p class="text-xs text-slate-400 font-mono" id="qrCodeText"></p>
+                </div>
+
+                <p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl font-medium">
+                    💡 短い承認コードで生成されているため、暗い場所や遠くからでも素早くスキャンできます。
+                </p>
             </div>
-
-            <div class="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center space-y-3">
-                <div id="qrcode" class="p-4 bg-white rounded-2xl shadow-md border border-slate-100"></div>
-                <p class="text-xs text-slate-400 font-mono" id="qrCodeText"></p>
-            </div>
-
-            <p class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl font-medium">
-                💡 短い承認コードで生成されているため、暗い場所や遠くからでも素早くスキャンできます。
-            </p>
         </div>
+        <!-- ▲▲▲ TAB 2 終了 ▲▲▲ -->
 
     </main>
 
+    <!-- JavaScript -->
     <script>
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzTjAqp9fhtXn56ZbB3QLWUrUAife7Jaz6A4xHmnwRamA7d23lo6loiiHMdaeubz8bP/exec";
         
@@ -136,7 +163,7 @@
         });
 
         // ----------------------------------------------------
-        // 承認用QRコード生成（高精度・高速読み取り用）
+        // 承認用QRコード生成
         // ----------------------------------------------------
         function initQRCode() {
             document.getElementById("qrCodeText").textContent = `CODE: ${TEACHER_QR_TARGET}`;
@@ -153,7 +180,7 @@
         }
 
         // ----------------------------------------------------
-        // タブ切り替え
+        // タブ切り替え（SWinTeacherスタイルのアクティブ・非アクティブクラス切り替え）
         // ----------------------------------------------------
         function switchTab(target) {
             const btnSummary = document.getElementById('tab-btn-summary');
@@ -162,8 +189,8 @@
             const panelSummary = document.getElementById('panel-summary');
             const panelQrcode = document.getElementById('panel-qrcode');
 
-            const activeClass = "flex-1 py-2.5 px-3 rounded-lg font-bold text-sm text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-2";
-            const inactiveClass = "flex-1 py-2.5 px-3 rounded-lg font-semibold text-sm text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-2";
+            const activeClass = "px-4 py-1.5 rounded-lg font-semibold text-indigo-700 bg-white shadow-sm transition-all duration-200 flex items-center gap-1.5";
+            const inactiveClass = "px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-1.5";
 
             panelSummary.classList.add('hidden');
             panelQrcode.classList.add('hidden');
@@ -234,7 +261,7 @@
                 document.getElementById("updateTime").textContent = "最終更新: " + new Date().toLocaleTimeString("ja-JP");
             } catch (err) {
                 console.error("集計データ読み込みエラー:", err);
-                document.getElementById("summaryBody").innerHTML = `<tr><td colspan="3" class="py-6 text-center text-red-500">データ取得に失敗しました。</td></tr>`;
+                document.getElementById("summaryBody").innerHTML = `<tr><td colspan="3" class="text-center py-4 text-red-500">データ取得に失敗しました。</td></tr>`;
             }
         }
 
@@ -249,7 +276,7 @@
             );
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="py-6 text-center text-slate-400">該当する生徒が見つかりません。</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">該当する生徒が見つかりません。</td></tr>`;
                 return;
             }
 
@@ -271,20 +298,19 @@
 
             filtered.forEach(student => {
                 const tr = document.createElement("tr");
-                tr.className = "hover:bg-slate-50 transition-colors border-b border-slate-100";
 
                 const examTd = document.createElement("td");
-                examTd.className = "py-2.5 px-3 text-center text-xs";
+                examTd.className = "exam-date-cell";
                 if (student.examDates.length === 0) {
-                    examTd.innerHTML = `<span class="text-slate-400">未設定</span>`;
+                    examTd.textContent = "未設定";
                 } else {
                     student.examDates.forEach(exam => {
                         const div = document.createElement("div");
                         if (exam.daysUntil !== null && exam.daysUntil < 0) {
                             div.className = "exam-finished";
-                            div.innerHTML = `${exam.text} <span class="text-emerald-600">✓</span>`;
+                            div.textContent = exam.text + " ✅";
                         } else {
-                            div.className = "exam-active font-semibold text-slate-700";
+                            div.className = "exam-active";
                             div.textContent = exam.text;
                         }
                         examTd.appendChild(div);
@@ -292,16 +318,18 @@
                 }
 
                 const nameTd = document.createElement("td");
-                nameTd.className = "py-2.5 px-3 font-medium";
-                nameTd.innerHTML = `
-                    <button onclick="showHistory('${student.id}', '${student.fullName}')" class="text-indigo-600 hover:text-indigo-800 hover:underline font-bold text-left">
-                        ${student.name} <span class="text-xs text-slate-500 font-normal">(${student.id})</span>
-                    </button>
-                `;
+                nameTd.className = "student-cell";
+                const studentLink = document.createElement("span");
+                studentLink.className = "student-link";
+                studentLink.textContent = student.name + " " + student.id;
+                studentLink.onclick = function() {
+                    showHistory(student.id, student.name + " " + student.id);
+                };
+                nameTd.appendChild(studentLink);
 
                 const countTd = document.createElement("td");
-                countTd.className = "py-2.5 px-3 text-center font-bold";
-                countTd.innerHTML = `<span class="inline-block px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs">${student.count} 回</span>`;
+                countTd.className = "count-cell";
+                countTd.textContent = student.count + "回";
 
                 tr.appendChild(examTd);
                 tr.appendChild(nameTd);
@@ -319,7 +347,6 @@
             return Number(matchA[2]) - Number(matchB[2]);
         }
 
-        // SWinTeacher の面接履歴表示ロジック
         async function showHistory(studentId, displayName) {
             const historyArea = document.getElementById("historyArea");
             historyArea.innerHTML = "<p>読み込み中...</p>";
