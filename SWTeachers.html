@@ -10,6 +10,12 @@
     <style>
         .exam-active { font-weight: bold; color: #0f172a; }
         .exam-finished { font-weight: normal; color: #64748b; }
+
+        /* SWinTeacher の面接履歴テーブルスタイル */
+        .app2-table { border-collapse: collapse; width: 100%; font-size: 14px; background-color: #ffffff; }
+        .app2-table th, .app2-table td { border: 1px solid #cbd5e1; padding: 8px 10px; }
+        .app2-table th { background: #f8fafc; font-weight: 600; color: #334155; }
+        #historyArea h2 { margin-top: 0; font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #0f172a; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-10 flex flex-col">
@@ -86,13 +92,10 @@
                     </div>
                 </div>
 
-                <!-- 右側：詳細履歴エリア -->
+                <!-- 右側：詳細履歴エリア（SWinTeacherのスタイルを適用） -->
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 h-fit">
-                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5 border-b pb-2 border-slate-200">
-                        <span>📜</span> 個別面接履歴
-                    </h3>
-                    <div id="historyArea" class="text-xs text-slate-500 min-h-[200px]">
-                        一覧から生徒の名前をクリックすると、ここに面接実施履歴が表示されます。
+                    <div id="historyArea" class="text-xs text-slate-500 min-h-[250px]">
+                        生徒IDをクリックしてください。
                     </div>
                 </div>
             </div>
@@ -316,51 +319,41 @@
             return Number(matchA[2]) - Number(matchB[2]);
         }
 
+        // SWinTeacher の面接履歴表示ロジック
         async function showHistory(studentId, displayName) {
             const historyArea = document.getElementById("historyArea");
-            historyArea.innerHTML = `<p class="text-slate-500 animate-pulse">履歴を取得中...</p>`;
+            historyArea.innerHTML = "<p>読み込み中...</p>";
 
             try {
                 const res = await fetch(GAS_WEB_APP_URL + "?mode=history&studentId=" + encodeURIComponent(studentId));
                 const data = await res.json();
 
                 if (!data || data.length === 0) {
-                    historyArea.innerHTML = `
-                        <div class="space-y-1">
-                            <p class="font-bold text-slate-800">${displayName}</p>
-                            <p class="text-slate-400">面接練習の記録はまだありません。</p>
-                        </div>
-                    `;
+                    historyArea.innerHTML = "<h2>" + displayName + " の面接履歴</h2><p>面接履歴はありません。</p>";
                     return;
                 }
 
-                let html = `
-                    <div class="space-y-2">
-                        <p class="font-bold text-slate-800 border-b border-slate-200 pb-1">${displayName}</p>
-                        <div class="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
-                `;
+                let html = "<h2>" + displayName + " の面接履歴</h2>";
+                html += "<table class='app2-table'>";
+                html += "<thead><tr><th>回数</th><th>日時</th><th>担当先生</th></tr></thead><tbody>";
 
                 data.forEach((item, index) => {
-                    let dateText = item.datetime || "";
+                    let dateText = item.datetime || item.dateTime || item.timestamp || "";
                     if (dateText) {
                         const d = new Date(dateText);
                         if (!isNaN(d.getTime())) {
-                            dateText = d.toLocaleString("ja-JP", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+                            dateText = d.toLocaleString("ja-JP");
                         }
                     }
-                    html += `
-                        <div class="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center text-xs shadow-sm">
-                            <span class="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">第${index + 1}回</span>
-                            <span class="text-slate-600">${dateText}</span>
-                            <span class="font-bold text-slate-800">${item.teacher} 先生</span>
-                        </div>
-                    `;
+                    const teacher = item.teacher || item.teacherName || "";
+                    html += "<tr><td>" + (index + 1) + "回目</td><td>" + dateText + "</td><td>" + teacher + "</td></tr>";
                 });
 
-                html += `</div></div>`;
+                html += "</tbody></table>";
                 historyArea.innerHTML = html;
             } catch (err) {
-                historyArea.innerHTML = `<p class="text-red-500">履歴の取得に失敗しました。</p>`;
+                console.error(err);
+                historyArea.innerHTML = "<p>履歴の取得に失敗しました。</p>";
             }
         }
 
