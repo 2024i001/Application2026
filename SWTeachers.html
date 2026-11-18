@@ -297,7 +297,7 @@
                 let html = "<h2>" + displayName + " の面接履歴</h2>";
                 html += "<table class='app2-table'>";
                 // 評価と感想の列を追加
-                html += "<thead><tr><th style='white-space:nowrap;'>回数</th><th style='white-space:nowrap;'>日時</th><th style='white-space:nowrap;'>評価</th><th style='white-space:nowrap;'>担当先生</th><th>感想・振り返り</th></tr></thead><tbody>";
+                html += "<thead><tr><th style='white-space:nowrap;'>回数</th><th style='white-space:nowrap;'>日時</th><th style='white-space:nowrap;'>自己評価</th><th style='white-space:nowrap;'>担当先生</th><th>感想・振り返り</th></tr></thead><tbody>";
 
                 data.forEach((item, index) => {
                     let dateText = item.datetime || item.dateTime || item.timestamp || "";
