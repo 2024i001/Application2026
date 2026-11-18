@@ -88,6 +88,7 @@
                             <option value="exam-desc">試験日順（遠い順）</option>
                         </select>
                         <input type="text" id="searchInput" oninput="renderSummary()" placeholder="生徒名・IDで絞り込み...">
+                        <input type="text" id="teacherSearchInput" oninput="renderSummary()" placeholder="先生名で絞り込み...">
                         <button onclick="refreshData()">🔄 更新</button>
                         <span id="updateTime">更新中...</span>
                     </div>
@@ -145,6 +146,7 @@
                     const match = studentName.match(/\d+[a-zA-Z]\d+/);
                     const studentId = match ? match[0] : studentName;
                     const displayName = studentName.replace(studentId, "").trim() || studentName;
+                    const summaryItem = summaryData[studentName];
 
                     const examList = (examData[studentId] || []).filter(d => d && String(d).trim() !== "");
 
@@ -170,7 +172,8 @@
                         fullName: studentName,
                         name: displayName,
                         id: studentId,
-                        count: Number(summaryData[studentName]) || 0,
+                        count: summaryItem.count || 0,
+                        histories: summaryItem.histories || [],
                         examDates: parsedExamDates
                     });
                 }
@@ -186,6 +189,7 @@
         function renderSummary() {
             const sortType = document.getElementById("sortSelect").value;
             const filterKeyword = document.getElementById("searchInput").value.trim().toLowerCase();
+            const teacherKeyword = document.getElementById("teacherSearchInput").value.trim().toLowerCase();
             const tbody = document.getElementById("summaryBody");
             tbody.innerHTML = "";
 
@@ -193,25 +197,34 @@
                 s.fullName.toLowerCase().includes(filterKeyword) || s.id.toLowerCase().includes(filterKeyword)
             );
 
+            if (teacherKeyword !== "") {
+                filtered = filtered.filter(s => s.histories.some(h => h.teacher.toLowerCase().includes(teacherKeyword)));
+                filtered.sort((a, b) => {
+                    const aLatest = Math.max(...a.histories.filter(h => h.teacher.toLowerCase().includes(teacherKeyword)).map(h => h.timestamp), 0);
+                    const bLatest = Math.max(...b.histories.filter(h => h.teacher.toLowerCase().includes(teacherKeyword)).map(h => h.timestamp), 0);
+                    return bLatest - aLatest; // 降順（新しい順）
+                });
+            } else {
+                if (sortType === "id-asc") {
+                    filtered.sort((a, b) => compareId(a.id, b.id));
+                } else if (sortType === "id-desc") {
+                    filtered.sort((a, b) => compareId(b.id, a.id));
+                } else if (sortType === "count-desc") {
+                    filtered.sort((a, b) => b.count - a.count || compareId(a.id, b.id));
+                } else if (sortType === "count-asc") {
+                    filtered.sort((a, b) => a.count - b.count || compareId(a.id, b.id));
+                } else if (sortType === "exam-asc" || sortType === "exam-desc") {
+                    filtered.sort((a, b) => {
+                        const dateA = a.examDates[0]?.date ? a.examDates[0].date.getTime() : 9999999999999;
+                        const dateB = b.examDates[0]?.date ? b.examDates[0].date.getTime() : 9999999999999;
+                        return sortType === "exam-asc" ? dateA - dateB : dateB - dateA;
+                    });
+                }
+            }
+
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">該当する生徒が見つかりません。</td></tr>`;
                 return;
-            }
-
-            if (sortType === "id-asc") {
-                filtered.sort((a, b) => compareId(a.id, b.id));
-            } else if (sortType === "id-desc") {
-                filtered.sort((a, b) => compareId(b.id, a.id));
-            } else if (sortType === "count-desc") {
-                filtered.sort((a, b) => b.count - a.count || compareId(a.id, b.id));
-            } else if (sortType === "count-asc") {
-                filtered.sort((a, b) => a.count - b.count || compareId(a.id, b.id));
-            } else if (sortType === "exam-asc" || sortType === "exam-desc") {
-                filtered.sort((a, b) => {
-                    const dateA = a.examDates[0]?.date ? a.examDates[0].date.getTime() : 9999999999999;
-                    const dateB = b.examDates[0]?.date ? b.examDates[0].date.getTime() : 9999999999999;
-                    return sortType === "exam-asc" ? dateA - dateB : dateB - dateA;
-                });
             }
 
             filtered.forEach(student => {
@@ -280,7 +293,7 @@
 
                 let html = "<h2>" + displayName + " の面接履歴</h2>";
                 html += "<table class='app2-table'>";
-                html += "<thead><tr><th>回数</th><th>日時</th><th>担当先生</th></tr></thead><tbody>";
+                html += "<thead><tr><th>回数</th><th>日時</th><th>評価</th><th>担当先生</th></tr></thead><tbody>";
 
                 data.forEach((item, index) => {
                     let dateText = item.datetime || item.dateTime || item.timestamp || "";
@@ -291,7 +304,9 @@
                         }
                     }
                     const teacher = item.teacher || item.teacherName || "";
-                    html += "<tr><td>" + (index + 1) + "回目</td><td>" + dateText + "</td><td>" + teacher + "</td></tr>";
+                    const ratingStar = item.rating ? `☆${item.rating}` : "-";
+
+                    html += "<tr><td>" + (index + 1) + "回目</td><td>" + dateText + "</td><td style='color:#eab308; font-weight:bold; text-align:center;'>" + ratingStar + "</td><td>" + teacher + "</td></tr>";
                 });
 
                 html += "</tbody></table>";
