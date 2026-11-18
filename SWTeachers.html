@@ -38,7 +38,7 @@
         .exam-active { font-weight: bold; color: #0f172a; }
         .exam-finished { font-weight: normal; color: #64748b; }
         #updateTime { color: #64748b; font-size: 12px; white-space: nowrap; }
-        #historyArea { border: 1px solid #e2e8f0; padding: 12px; min-height: 250px; background: #f8fafc; border-radius: 8px; }
+        #historyArea { border: 1px solid #e2e8f0; padding: 12px; min-height: 250px; background: #f8fafc; border-radius: 8px; overflow-x: auto; }
         #historyArea h2 { margin-top: 0; font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #0f172a; }
 
         /* レスポンシブ調整 */
@@ -109,7 +109,7 @@
 
                 <!-- 右側：詳細履歴 -->
                 <div class="app2-right">
-                    <h2>面接履歴</h2>
+                    <h2>面接履歴詳細</h2>
                     <div id="historyArea">生徒IDをクリックしてください。</div>
                 </div>
             </div>
@@ -197,14 +197,17 @@
                 s.fullName.toLowerCase().includes(filterKeyword) || s.id.toLowerCase().includes(filterKeyword)
             );
 
+            // 先生名で絞り込み
             if (teacherKeyword !== "") {
                 filtered = filtered.filter(s => s.histories.some(h => h.teacher.toLowerCase().includes(teacherKeyword)));
+                // 指定した先生との最新面接日時順（降順）にソート
                 filtered.sort((a, b) => {
                     const aLatest = Math.max(...a.histories.filter(h => h.teacher.toLowerCase().includes(teacherKeyword)).map(h => h.timestamp), 0);
                     const bLatest = Math.max(...b.histories.filter(h => h.teacher.toLowerCase().includes(teacherKeyword)).map(h => h.timestamp), 0);
-                    return bLatest - aLatest; // 降順（新しい順）
+                    return bLatest - aLatest; 
                 });
             } else {
+                // 通常のソート
                 if (sortType === "id-asc") {
                     filtered.sort((a, b) => compareId(a.id, b.id));
                 } else if (sortType === "id-desc") {
@@ -293,20 +296,30 @@
 
                 let html = "<h2>" + displayName + " の面接履歴</h2>";
                 html += "<table class='app2-table'>";
-                html += "<thead><tr><th>回数</th><th>日時</th><th>評価</th><th>担当先生</th></tr></thead><tbody>";
+                // 評価と感想の列を追加
+                html += "<thead><tr><th style='white-space:nowrap;'>回数</th><th style='white-space:nowrap;'>日時</th><th style='white-space:nowrap;'>評価</th><th style='white-space:nowrap;'>担当先生</th><th>感想・振り返り</th></tr></thead><tbody>";
 
                 data.forEach((item, index) => {
                     let dateText = item.datetime || item.dateTime || item.timestamp || "";
                     if (dateText) {
                         const d = new Date(dateText);
                         if (!isNaN(d.getTime())) {
-                            dateText = d.toLocaleString("ja-JP");
+                            dateText = d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
                         }
                     }
                     const teacher = item.teacher || item.teacherName || "";
-                    const ratingStar = item.rating ? `☆${item.rating}` : "-";
+                    
+                    const ratingNum = parseInt(item.rating, 10);
+                    const ratingStar = (!isNaN(ratingNum) && ratingNum > 0) ? "★".repeat(ratingNum) : "-";
+                    const impressionText = item.impression || "-";
 
-                    html += "<tr><td>" + (index + 1) + "回目</td><td>" + dateText + "</td><td style='color:#eab308; font-weight:bold; text-align:center;'>" + ratingStar + "</td><td>" + teacher + "</td></tr>";
+                    html += "<tr>";
+                    html += `<td style='white-space:nowrap;'>${index + 1}回目</td>`;
+                    html += `<td style='white-space:nowrap;'>${dateText}</td>`;
+                    html += `<td style='color:#eab308; font-weight:bold; text-align:center; white-space:nowrap;'>${ratingStar}</td>`;
+                    html += `<td style='white-space:nowrap;'>${teacher}</td>`;
+                    html += `<td style='font-size:12px; color:#475569; max-width: 250px; word-wrap: break-word;'>${impressionText}</td>`;
+                    html += "</tr>";
                 });
 
                 html += "</tbody></table>";
